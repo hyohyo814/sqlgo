@@ -41,19 +41,40 @@ func main() {
 	if pingErr != nil {
 		log.Fatal("DB not found!", pingErr)
 	}
-
+	// Connection feedback
 	fmt.Println("Connected!")
-	data, err := albumsByArtist(db, "John Coltrane")
+
+	// query multiple rows
+	albums, err := albumsByArtist(db, "John Coltrane")
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(data)
+	fmt.Printf("Albums found: %v\n", albums)
+
+	// query single row
+	alb, err := albumByID(db, 2)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Album found: %v\n", alb)
+
+	// db insert
+	albID, err := addAlbum(db, Album{
+		Title: "The Modern Sound of Betty Carter",
+		Artist: "Betty Carter",
+		Price: 49.99,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("ID of added album: %v\n", albID)
 }
 
 func albumsByArtist(db *sql.DB, name string) ([]Album, error){
 	var albums []Album
+	query := `SELECT * FROM album WHERE artist=$1`
 
-	rows, err := db.Query("SELECT * FROM album WHERE artist = ?", name)
+	rows, err := db.Query(query, name)
 	if err != nil {
 		return nil, fmt.Errorf("albumsByArtist %q: %v", name, err)
 	}
@@ -72,3 +93,29 @@ func albumsByArtist(db *sql.DB, name string) ([]Album, error){
 	}
 	return albums, nil
 }
+
+func albumByID(db *sql.DB, id int64) (Album, error) {
+	var alb Album
+	query := `SELECT * FROM album WHERE id = $1`
+
+	row := db.QueryRow(query, id)
+	if err := row.Scan(&alb.ID, &alb.Title, &alb.Artist, &alb.Price); err != nil {
+		if err == sql.ErrNoRows {
+			return alb, fmt.Errorf("albumByID %d: %v", id, err)
+		}
+		return alb, fmt.Errorf("albumsByID %d: %v", id, err)
+	}
+	return alb, nil
+}
+
+func addAlbum(db *sql.DB, alb Album) (int64, error) {
+	insert := `INSERT INTO album (title, artist, price) VALUES ($1, $2, $3) RETURNING id`
+
+	var id int64
+	err := db.QueryRow(insert, alb.Title, alb.Artist, alb.Price).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("addAlbum: %v", err)
+	}
+	return id, nil
+}
+
