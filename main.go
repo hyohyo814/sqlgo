@@ -9,8 +9,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-var db *sql.DB
-
 type Album struct {
 	ID     int64
 	Title  string
@@ -18,8 +16,10 @@ type Album struct {
 	Price  float32
 }
 
+
 func main() {
 	// env
+	var db *sql.DB
 	var (
 		User   = os.Getenv("DBUSER")
 		Passwd = os.Getenv("DBPASS")
@@ -30,28 +30,27 @@ func main() {
 	psqlInfo := fmt.Sprintf("user=%s password=%s dbname=%s", User, Passwd, DBName)
 
 	// Open db conn
-	db, err := sql.Open("postgres", psqlInfo)
+	db, err = sql.Open("postgres", psqlInfo)
 
 	// Err handling
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("err opening connection", err)
 	}
 
 	pingErr := db.Ping()
 	if pingErr != nil {
-		log.Fatal(pingErr)
+		log.Fatal("DB not found!", pingErr)
 	}
 
 	fmt.Println("Connected!")
-
-	albums, err := albumsByArtist("Jon")
+	data, err := albumsByArtist(db, "John Coltrane")
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Albums found: %v\n", albums)
+	fmt.Println(data)
 }
 
-func albumsByArtist(name string) ([]Album, error) {
+func albumsByArtist(db *sql.DB, name string) ([]Album, error){
 	var albums []Album
 
 	rows, err := db.Query("SELECT * FROM album WHERE artist = ?", name)
@@ -67,7 +66,8 @@ func albumsByArtist(name string) ([]Album, error) {
 		}
 		albums = append(albums, alb)
 	}
-	if err := rows.Err(); err != nil {
+
+	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("albumsByArtist %q: %v", name, err)
 	}
 	return albums, nil
